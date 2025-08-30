@@ -132,16 +132,20 @@ class _WebViewFaceLivenessState extends State<WebViewFaceLiveness> {
     try {
       final cameraStatus = await Permission.camera.status;
       final microphoneStatus = await Permission.microphone.status;
-      
+
       print('🔍 PERMISSION DEBUG:');
       print('  📷 Camera: $cameraStatus');
       print('  🎤 Microphone: $microphoneStatus');
       print('  🔒 Camera granted: ${cameraStatus.isGranted}');
       print('  🔒 Camera denied: ${cameraStatus.isDenied}');
-      print('  🔒 Camera permanently denied: ${cameraStatus.isPermanentlyDenied}');
-      
+      print(
+        '  🔒 Camera permanently denied: ${cameraStatus.isPermanentlyDenied}',
+      );
+
       if (cameraStatus.isPermanentlyDenied) {
-        print('⚠️ Camera permission permanently denied - user needs to enable in settings');
+        print(
+          '⚠️ Camera permission permanently denied - user needs to enable in settings',
+        );
       }
     } catch (e) {
       print('❌ Error checking permissions: $e');
@@ -199,36 +203,89 @@ class _WebViewFaceLivenessState extends State<WebViewFaceLiveness> {
 
   Future<void> _requestCameraPermission() async {
     try {
-      print('📷 Requesting camera and microphone permissions...');
+      print('📷 Requesting camera and microphone permissions for ${Platform.isIOS ? 'iOS' : 'Android'}...');
       
-      // Request both camera and microphone permissions
-      final Map<Permission, PermissionStatus> statuses = await [
-        Permission.camera,
-        Permission.microphone,
-      ].request();
+      // Check current permission status first
+      final initialCameraStatus = await Permission.camera.status;
+      final initialMicrophoneStatus = await Permission.microphone.status;
+      
+      print('📋 Initial permission status:');
+      print('  📷 Camera: $initialCameraStatus');
+      print('  🎤 Microphone: $initialMicrophoneStatus');
+      
+      // Request permissions based on current status
+      Map<Permission, PermissionStatus> statuses = {};
+      
+      if (Platform.isIOS) {
+        // iOS: Request permissions explicitly, especially for camera
+        print('🍎 iOS: Explicitly requesting camera permission...');
+        
+        if (initialCameraStatus != PermissionStatus.granted) {
+          final cameraResult = await Permission.camera.request();
+          statuses[Permission.camera] = cameraResult;
+          print('📷 iOS Camera permission request result: $cameraResult');
+        } else {
+          statuses[Permission.camera] = initialCameraStatus;
+        }
+        
+        if (initialMicrophoneStatus != PermissionStatus.granted) {
+          final microphoneResult = await Permission.microphone.request();
+          statuses[Permission.microphone] = microphoneResult;
+          print('🎤 iOS Microphone permission request result: $microphoneResult');
+        } else {
+          statuses[Permission.microphone] = initialMicrophoneStatus;
+        }
+        
+        // iOS-specific handling
+        if (statuses[Permission.camera] == PermissionStatus.permanentlyDenied) {
+          print('⚠️ iOS: Camera permission permanently denied, showing settings dialog');
+          if (mounted) {
+            _showIOSPermissionDialog();
+          }
+          return;
+        }
+        
+      } else {
+        // Android: Request both permissions together
+        print('🤖 Android: Requesting camera and microphone permissions together...');
+        statuses = await [
+          Permission.camera,
+          Permission.microphone,
+        ].request();
+      }
       
       final cameraStatus = statuses[Permission.camera];
       final microphoneStatus = statuses[Permission.microphone];
       
-      print('📷 Camera permission status: $cameraStatus');
-      print('🎤 Microphone permission status: $microphoneStatus');
+      print('📋 Final permission status:');
+      print('  📷 Camera: $cameraStatus');
+      print('  🎤 Microphone: $microphoneStatus');
       
+      // Handle permission results
       if (cameraStatus != PermissionStatus.granted) {
+        final message = Platform.isIOS 
+          ? 'Camera permission is required for face liveness detection. Please allow camera access when prompted by the WebView or in iPhone Settings > Privacy & Security > Camera.'
+          : 'Camera permission is required for face liveness detection. Please grant camera access in app settings.';
+        
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text(
-                'Camera permission is required for face liveness detection. Please grant camera access in app settings.',
-              ),
+            SnackBar(
+              content: Text(message),
               backgroundColor: Colors.red,
-              duration: Duration(seconds: 5),
+              duration: const Duration(seconds: 6),
+              action: Platform.isAndroid ? SnackBarAction(
+                label: 'Settings',
+                onPressed: () => openAppSettings(),
+              ) : null,
             ),
           );
         }
+      } else {
+        print('✅ ${Platform.isIOS ? 'iOS' : 'Android'} camera permission granted successfully');
       }
       
       if (microphoneStatus != PermissionStatus.granted) {
-        print('⚠️ Microphone permission not granted - WebView might have issues');
+        print('⚠️ Microphone permission not granted - WebView might have limited functionality');
       }
       
     } catch (e) {
@@ -237,21 +294,55 @@ class _WebViewFaceLivenessState extends State<WebViewFaceLiveness> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: const Text(
-              'Unable to request permissions. Please grant camera access manually in Settings.',
+            content: Text(
+              Platform.isIOS 
+                ? 'Unable to request permissions. Please allow camera access in iPhone Settings > Privacy & Security > Camera > Mercle.'
+                : 'Unable to request permissions. Please grant camera access manually in Settings.',
             ),
             backgroundColor: Colors.orange,
             action: SnackBarAction(
               label: 'Settings',
               onPressed: () => openAppSettings(),
             ),
-            duration: const Duration(seconds: 5),
+            duration: const Duration(seconds: 6),
           ),
         );
       }
     }
   }
-
+  
+  /// Show iOS-specific permission dialog
+  void _showIOSPermissionDialog() {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Camera Permission Required'),
+          content: const Text(
+            'Face liveness detection requires camera access. Please enable camera permission in iPhone Settings > Privacy & Security > Camera > Mercle.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+                if (widget.onCancel != null) {
+                  widget.onCancel!();
+                }
+              },
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+                openAppSettings();
+              },
+              child: const Text('Settings'),
+            ),
+          ],
+        );
+      },
+    );
+  }
   void _initializeWebView() {
     if (!_urlInitialized) return; // Wait for URL to be initialized
 
@@ -326,15 +417,17 @@ class _WebViewFaceLivenessState extends State<WebViewFaceLiveness> {
 
   /// Configure Android WebView for camera permissions
   void _configureAndroidWebView() {
-    if (Platform.isAndroid && controller!.platform is AndroidWebViewController) {
-      final androidController = controller!.platform as AndroidWebViewController;
-      
+    if (Platform.isAndroid &&
+        controller!.platform is AndroidWebViewController) {
+      final androidController =
+          controller!.platform as AndroidWebViewController;
+
       print('🤖 Configuring Android WebView for camera access...');
-      
+
       try {
         // Enable media playback and DOM storage
         androidController.setMediaPlaybackRequiresUserGesture(false);
-        
+
         print('✅ Android WebView configured for media access');
       } catch (e) {
         print('⚠️ Could not configure Android WebView settings: $e');
@@ -367,8 +460,44 @@ class _WebViewFaceLivenessState extends State<WebViewFaceLiveness> {
           console.log('⚠️ Cannot query camera permissions:', e);
         });
         
+        // For Android WebView, proactively request camera access
+        console.log('📷 Attempting to request camera access for Android WebView...');
+        navigator.mediaDevices.getUserMedia({ 
+          video: { 
+            facingMode: 'user',
+            width: { ideal: 640 },
+            height: { ideal: 480 }
+          },
+          audio: false
+        }).then(function(stream) {
+          console.log('✅ Camera access granted! Stream obtained:', stream);
+          // Stop the stream since we're just testing permission
+          stream.getTracks().forEach(track => track.stop());
+          console.log('🛑 Test stream stopped, camera ready for use');
+        }).catch(function(error) {
+          console.error('❌ Camera access failed:', error);
+          console.log('🔍 Error name:', error.name);
+          console.log('🔍 Error message:', error.message);
+          
+          // Send error information back to Flutter
+          if (window.flutterFaceLiveness) {
+            window.flutterFaceLiveness.postMessage(JSON.stringify({
+              type: 'FACE_LIVENESS_ERROR',
+              message: 'Camera access failed: ' + error.message,
+              fullError: { state: 'CAMERA_ACCESS_ERROR', name: error.name }
+            }));
+          }
+        });
+        
       } else {
         console.error('❌ getUserMedia API not available!');
+        if (window.flutterFaceLiveness) {
+          window.flutterFaceLiveness.postMessage(JSON.stringify({
+            type: 'FACE_LIVENESS_ERROR',
+            message: 'Camera API not available in this WebView',
+            fullError: { state: 'CAMERA_NOT_FOUND' }
+          }));
+        }
       }
       
       // Ensure flutterFaceLiveness is available

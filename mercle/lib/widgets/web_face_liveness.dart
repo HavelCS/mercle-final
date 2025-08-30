@@ -25,7 +25,7 @@ class _WebFaceLivenessState extends State<WebFaceLiveness> {
 
   // Your deployed React Face Liveness app URL
   static const String _faceLivenessUrl =
-      'https://face-liveness-react-dv7o2xss6.vercel.app';
+      'https://face-liveness-react-pvktmdl76.vercel.app';
 
   @override
   void initState() {
@@ -36,8 +36,9 @@ class _WebFaceLivenessState extends State<WebFaceLiveness> {
 
   void _initiateFaceScan() async {
     // Generate unique session ID
-    sessionId = 'flutter-web-${DateTime.now().millisecondsSinceEpoch}-${(DateTime.now().microsecond % 1000)}';
-    
+    sessionId =
+        'flutter-web-${DateTime.now().millisecondsSinceEpoch}-${(DateTime.now().microsecond % 1000)}';
+
     setState(() {
       isLoading = false; // Not loading initially, waiting for user action
     });
@@ -45,26 +46,26 @@ class _WebFaceLivenessState extends State<WebFaceLiveness> {
 
   void _startPollingForResults() async {
     if (sessionId == null) return;
-    
+
     setState(() {
       isLoading = true;
     });
-    
+
     // Poll for results every 3 seconds for up to 5 minutes
     int attempts = 0;
     const maxAttempts = 100; // 5 minutes with 3-second intervals
-    
+
     while (attempts < maxAttempts) {
       await Future.delayed(const Duration(seconds: 3));
       attempts++;
-      
+
       // TODO: Replace this with actual API call to check session status
       // For now, simulate completion after 15 seconds (5 attempts)
       if (attempts >= 5) {
         setState(() {
           isLoading = false;
         });
-        
+
         if (widget.onResult != null) {
           widget.onResult!({
             'success': true,
@@ -78,12 +79,12 @@ class _WebFaceLivenessState extends State<WebFaceLiveness> {
         return;
       }
     }
-    
+
     // Timeout after 5 minutes
     setState(() {
       isLoading = false;
     });
-    
+
     if (widget.onError != null) {
       widget.onError!('Face scan timed out. Please try again.');
     }
@@ -91,16 +92,16 @@ class _WebFaceLivenessState extends State<WebFaceLiveness> {
 
   void _openFaceLivenessInNewTab() async {
     if (sessionId == null) return;
-    
+
     // Construct URL with session ID
     final urlWithSession = '$_faceLivenessUrl?sessionId=$sessionId';
-    
+
     if (await canLaunchUrl(Uri.parse(urlWithSession))) {
       await launchUrl(
         Uri.parse(urlWithSession),
         mode: LaunchMode.externalApplication,
       );
-      
+
       // Start polling for results after opening the external app
       _startPollingForResults();
     } else {
@@ -152,7 +153,7 @@ class _WebFaceLivenessState extends State<WebFaceLiveness> {
                   ),
                 ),
                 const SizedBox(height: 16),
-                
+
                 // Session ID display
                 if (sessionId != null) ...[
                   Container(
@@ -161,16 +162,15 @@ class _WebFaceLivenessState extends State<WebFaceLiveness> {
                     decoration: BoxDecoration(
                       color: Colors.white.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: Colors.white.withValues(alpha: 0.3)),
+                      border: Border.all(
+                        color: Colors.white.withValues(alpha: 0.3),
+                      ),
                     ),
                     child: Column(
                       children: [
                         const Text(
                           'Session ID:',
-                          style: TextStyle(
-                            color: Colors.white70,
-                            fontSize: 12,
-                          ),
+                          style: TextStyle(color: Colors.white70, fontSize: 12),
                         ),
                         const SizedBox(height: 4),
                         Text(
@@ -187,7 +187,7 @@ class _WebFaceLivenessState extends State<WebFaceLiveness> {
                   ),
                   const SizedBox(height: 24),
                 ],
-                
+
                 if (kIsWeb && !isLoading) ...[
                   ElevatedButton.icon(
                     onPressed: _openFaceLivenessInNewTab,
@@ -208,10 +208,7 @@ class _WebFaceLivenessState extends State<WebFaceLiveness> {
                     child: Text(
                       'This will open the face scanning app\nin a new tab with your session ID',
                       textAlign: TextAlign.center,
-                      style: TextStyle(
-                        color: Colors.white70,
-                        fontSize: 12,
-                      ),
+                      style: TextStyle(color: Colors.white70, fontSize: 12),
                     ),
                   ),
                 ] else if (!kIsWeb) ...[
@@ -220,7 +217,7 @@ class _WebFaceLivenessState extends State<WebFaceLiveness> {
                     style: TextStyle(color: Colors.white70),
                   ),
                 ],
-                
+
                 if (isLoading) ...[
                   const SizedBox(height: 24),
                   const Text(
@@ -234,10 +231,7 @@ class _WebFaceLivenessState extends State<WebFaceLiveness> {
                   const SizedBox(height: 8),
                   const Text(
                     'Complete the scan in the opened tab',
-                    style: TextStyle(
-                      color: Colors.white70,
-                      fontSize: 12,
-                    ),
+                    style: TextStyle(color: Colors.white70, fontSize: 12),
                   ),
                 ],
               ],
