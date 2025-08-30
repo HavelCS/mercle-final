@@ -1,0 +1,41 @@
+{
+  "dev": {
+    "awscloudformation": {
+      "AuthRoleName": "amplify-facelivenessfrontend-dev-8ce26-authRole",
+      "UnauthRoleArn": "arn:aws:iam::135699253995:role/amplify-facelivenessfrontend-dev-8ce26-unauthRole",
+      "AuthRoleArn": "arn:aws:iam::135699253995:role/amplify-facelivenessfrontend-dev-8ce26-authRole",
+      "Region": "us-east-1",
+      "DeploymentBucketName": "amplify-facelivenessfrontend-dev-8ce26-deployment",
+      "UnauthRoleName": "amplify-facelivenessfrontend-dev-8ce26-unauthRole",
+      "StackName": "amplify-facelivenessfrontend-dev-8ce26",
+      "StackId": "arn:aws:cloudformation:us-east-1:135699253995:stack/amplify-facelivenessfrontend-dev-8ce26/bec58bc0-6528-11f0-907f-12f0f424f28d",
+      "AmplifyAppId": "d3cmxzqhxsxacv"
+    },
+    "categories": {
+      "auth": {
+        "facelivenessfrontend5718281e": {}
+      }
+    }
+  },
+  "mercleaws": {
+    "awscloudformation": {
+      "AuthRoleName": "amplify-facelivenessfrontend-mercleaws-60739-authRole",
+      "UnauthRoleArn": "arn:aws:iam::135699253995:role/amplify-facelivenessfrontend-mercleaws-60739-unauthRole",
+      "AuthRoleArn": "arn:aws:iam::135699253995:role/amplify-facelivenessfrontend-mercleaws-60739-authRole",
+      "Region": "us-east-1",
+      "DeploymentBucketName": "amplify-facelivenessfrontend-mercleaws-60739-deployment",
+      "UnauthRoleName": "amplify-facelivenessfrontend-mercleaws-60739-unauthRole",
+      "StackName": "amplify-facelivenessfrontend-mercleaws-60739",
+      "StackId": "arn:aws:cloudformation:us-east-1:135699253995:stack/amplify-facelivenessfrontend-mercleaws-60739/f9f2abc0-82b4-11f0-b1a5-0ed65f036ff9",
+      "AmplifyAppId": "d3cmxzqhxsxacv"
+    },
+    "categories": {
+      "auth": {
+        "facelivenessfrontend5718281e": {}
+      },
+      "predictions": {
+        "mercleidentifyfaces": {}
+      }
+    }
+  }
+}

@@ -1,0 +1,47 @@
+{
+  "version": "1",
+  "cognitoConfig": {
+    "identityPoolName": "facelivenessfrontend5718281e_identitypool_5718281e",
+    "allowUnauthenticatedIdentities": true,
+    "resourceNameTruncated": "faceli5718281e",
+    "userPoolName": "facelivenessfrontend5718281e_userpool_5718281e",
+    "autoVerifiedAttributes": [
+      "phone_number"
+    ],
+    "mfaConfiguration": "OFF",
+    "mfaTypes": [
+      "SMS Text Message"
+    ],
+    "smsAuthenticationMessage": "Your authentication code is {####}",
+    "smsVerificationMessage": "Your verification code is {####}",
+    "emailVerificationSubject": "Your verification code",
+    "emailVerificationMessage": "Your verification code is {####}",
+    "defaultPasswordPolicy": false,
+    "passwordPolicyMinLength": 8,
+    "passwordPolicyCharacters": [],
+    "requiredAttributes": [
+      "email"
+    ],
+    "aliasAttributes": [],
+    "userpoolClientGenerateSecret": false,
+    "userpoolClientRefreshTokenValidity": 30,
+    "userpoolClientWriteAttributes": [
+      "email",
+      "phone_number"
+    ],
+    "userpoolClientReadAttributes": [
+      "email",
+      "phone_number"
+    ],
+    "userpoolClientLambdaRole": "faceli5718281e_userpoolclient_lambda_role",
+    "userpoolClientSetAttributes": false,
+    "sharedId": "5718281e",
+    "resourceName": "facelivenessfrontend5718281e",
+    "authSelections": "identityPoolAndUserPool",
+    "useDefault": "default",
+    "userPoolGroupList": [],
+    "serviceName": "Cognito",
+    "usernameCaseSensitive": false,
+    "useEnabledMfas": true
+  }
+}

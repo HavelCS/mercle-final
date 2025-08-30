@@ -1,0 +1,36 @@
+{
+  "auth": {
+    "facelivenessfrontend5718281e": {
+      "customAuth": false,
+      "dependsOn": [],
+      "frontendAuthConfig": {
+        "mfaConfiguration": "OFF",
+        "mfaTypes": [
+          "SMS"
+        ],
+        "passwordProtectionSettings": {
+          "passwordPolicyCharacters": [],
+          "passwordPolicyMinLength": 8
+        },
+        "signupAttributes": [
+          "EMAIL"
+        ],
+        "socialProviders": [],
+        "usernameAttributes": [],
+        "verificationMechanisms": [
+          "EMAIL"
+        ]
+      },
+      "providerPlugin": "awscloudformation",
+      "service": "Cognito"
+    }
+  },
+  "predictions": {
+    "mercleidentifyfaces": {
+      "dependsOn": [],
+      "identifyType": "identifyEntities",
+      "providerPlugin": "awscloudformation",
+      "service": "Rekognition"
+    }
+  }
+}

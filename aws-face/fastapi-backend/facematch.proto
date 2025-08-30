@@ -1,0 +1,59 @@
+syntax = "proto3";
+
+package facematch;
+
+// ===================================
+//  RPC 1: Enqueue a Search Job
+// ===================================
+
+message Query {
+  string id = 1;
+  repeated float vector = 2;
+}
+
+message BatchRequest {
+  repeated Query queries = 1;
+}
+
+message EnqueueResponse {
+    string job_id = 1;
+    string message = 2;
+}
+
+// ===================================
+//  RPC 2: Get a Job's Result
+// ===================================
+
+message ResultRequest {
+  string job_id = 1;
+}
+
+message QueryResult {
+  string id = 1;
+  double max_cosine_similarity = 2;
+  bool is_returning = 3;
+}
+
+message JobResultResponse {
+  enum Status {
+    UNKNOWN = 0;
+    COMPLETED = 1;
+    PENDING = 2; // We can add logic for this later if needed
+    NOT_FOUND = 3;
+  }
+  string job_id = 1;
+  Status status = 2;
+  repeated QueryResult results = 3;
+}
+
+// ===================================
+//  The Main Service Definition
+// ===================================
+
+service FaceMatch {
+  // Enqueues a job for asynchronous processing.
+  rpc Search(BatchRequest) returns (EnqueueResponse);
+
+  // Fetches the result of a previously submitted job.
+  rpc GetResult(ResultRequest) returns (JobResultResponse);
+}
