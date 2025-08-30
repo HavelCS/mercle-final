@@ -1,7 +1,9 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:webview_flutter/webview_flutter.dart';
+import 'package:webview_flutter_android/webview_flutter_android.dart';
 import 'package:permission_handler/permission_handler.dart';
 import '../services/auth_service.dart';
 
@@ -24,13 +26,63 @@ class FaceLivenessResult {
   });
 
   factory FaceLivenessResult.fromJson(Map<String, dynamic> json) {
+    // Safely extract confidence value, handling various types
+    double confidence = 0.0;
+    final confidenceValue = json['confidence'];
+    if (confidenceValue != null) {
+      if (confidenceValue is double) {
+        confidence = confidenceValue;
+      } else if (confidenceValue is int) {
+        confidence = confidenceValue.toDouble();
+      } else if (confidenceValue is String) {
+        confidence = double.tryParse(confidenceValue) ?? 0.0;
+      } else if (confidenceValue is Map) {
+        // If confidence is a map, try to extract a numeric value
+        confidence = 0.0;
+      }
+    }
+
+    // Safely extract message, handling various types and error conditions
+    String message = 'Unknown result';
+    final messageValue = json['message'];
+    final fullErrorValue = json['fullError'];
+
+    if (messageValue != null) {
+      if (messageValue is String && messageValue.isNotEmpty) {
+        message = messageValue;
+      } else if (messageValue is Map) {
+        // Message is an object, try to extract meaningful info
+        if (fullErrorValue is Map && fullErrorValue['state'] != null) {
+          final errorState = fullErrorValue['state'].toString();
+          switch (errorState) {
+            case 'CAMERA_ACCESS_ERROR':
+              message =
+                  'Camera access denied. Please allow camera permissions.';
+              break;
+            case 'CAMERA_NOT_FOUND':
+              message = 'No camera found on this device.';
+              break;
+            case 'PERMISSION_DENIED':
+              message = 'Camera permission was denied.';
+              break;
+            default:
+              message = 'Face liveness failed: $errorState';
+          }
+        } else {
+          message = 'Face liveness failed with unknown error';
+        }
+      } else {
+        message = messageValue.toString();
+      }
+    }
+
     return FaceLivenessResult(
       success: json['success'] ?? false,
       isLive: json['isLive'] ?? false,
-      confidence: (json['confidence'] ?? 0.0).toDouble(),
-      message: json['message'] ?? 'Unknown result',
-      sessionId: json['sessionId'],
-      fullResult: json['fullResult'],
+      confidence: confidence,
+      message: message,
+      sessionId: json['sessionId']?.toString(),
+      fullResult: json,
     );
   }
 }
@@ -62,24 +114,46 @@ class _WebViewFaceLivenessState extends State<WebViewFaceLiveness> {
   // Your deployed React Face Liveness app URL
   static const String _faceLivenessUrl =
       'https://face-liveness-react-qdq4tm1t5.vercel.app';
-  
+
   String _faceLivenessUrlWithToken = '';
   bool _urlInitialized = false;
 
   @override
   void initState() {
     super.initState();
+    _debugPermissions();
     _requestCameraPermission();
     _initializeUrlWithToken();
     _startTimeout();
   }
-  
+
+  /// Debug current permission status
+  Future<void> _debugPermissions() async {
+    try {
+      final cameraStatus = await Permission.camera.status;
+      final microphoneStatus = await Permission.microphone.status;
+      
+      print('🔍 PERMISSION DEBUG:');
+      print('  📷 Camera: $cameraStatus');
+      print('  🎤 Microphone: $microphoneStatus');
+      print('  🔒 Camera granted: ${cameraStatus.isGranted}');
+      print('  🔒 Camera denied: ${cameraStatus.isDenied}');
+      print('  🔒 Camera permanently denied: ${cameraStatus.isPermanentlyDenied}');
+      
+      if (cameraStatus.isPermanentlyDenied) {
+        print('⚠️ Camera permission permanently denied - user needs to enable in settings');
+      }
+    } catch (e) {
+      print('❌ Error checking permissions: $e');
+    }
+  }
+
   @override
   void dispose() {
     _timeoutTimer?.cancel();
     super.dispose();
   }
-  
+
   void _startTimeout() {
     // Set a 60 second timeout for face liveness
     _timeoutTimer = Timer(const Duration(seconds: 60), () {
@@ -100,12 +174,14 @@ class _WebViewFaceLivenessState extends State<WebViewFaceLiveness> {
     try {
       final token = await AuthService.getToken();
       final sessionId = widget.sessionId;
-      
+
       if (token != null && sessionId != null) {
-        _faceLivenessUrlWithToken = '$_faceLivenessUrl?token=${Uri.encodeComponent(token)}&sessionId=${Uri.encodeComponent(sessionId)}';
+        _faceLivenessUrlWithToken =
+            '$_faceLivenessUrl?token=${Uri.encodeComponent(token)}&sessionId=${Uri.encodeComponent(sessionId)}';
         print('🔑 Face liveness URL with token and sessionId initialized');
       } else if (token != null) {
-        _faceLivenessUrlWithToken = '$_faceLivenessUrl?token=${Uri.encodeComponent(token)}';
+        _faceLivenessUrlWithToken =
+            '$_faceLivenessUrl?token=${Uri.encodeComponent(token)}';
         print('🔑 Face liveness URL with token initialized (no sessionId)');
       } else {
         _faceLivenessUrlWithToken = _faceLivenessUrl;
@@ -122,98 +198,178 @@ class _WebViewFaceLivenessState extends State<WebViewFaceLiveness> {
   }
 
   Future<void> _requestCameraPermission() async {
-    // Skip permission request on macOS as it's handled by entitlements
-    // and will show system dialog automatically when camera is accessed
     try {
-      final status = await Permission.camera.request();
-      if (status != PermissionStatus.granted) {
+      print('📷 Requesting camera and microphone permissions...');
+      
+      // Request both camera and microphone permissions
+      final Map<Permission, PermissionStatus> statuses = await [
+        Permission.camera,
+        Permission.microphone,
+      ].request();
+      
+      final cameraStatus = statuses[Permission.camera];
+      final microphoneStatus = statuses[Permission.microphone];
+      
+      print('📷 Camera permission status: $cameraStatus');
+      print('🎤 Microphone permission status: $microphoneStatus');
+      
+      if (cameraStatus != PermissionStatus.granted) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
               content: Text(
-                'Camera permission is required for face liveness detection',
+                'Camera permission is required for face liveness detection. Please grant camera access in app settings.',
               ),
               backgroundColor: Colors.red,
+              duration: Duration(seconds: 5),
             ),
           );
         }
       }
+      
+      if (microphoneStatus != PermissionStatus.granted) {
+        print('⚠️ Microphone permission not granted - WebView might have issues');
+      }
+      
     } catch (e) {
-      // Permission handler not available on macOS, skip
-      print('⚠️ Permission handler not available on this platform: $e');
+      print('❌ Error requesting permissions: $e');
+      // Try to open app settings if permission request fails
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text(
+              'Unable to request permissions. Please grant camera access manually in Settings.',
+            ),
+            backgroundColor: Colors.orange,
+            action: SnackBarAction(
+              label: 'Settings',
+              onPressed: () => openAppSettings(),
+            ),
+            duration: const Duration(seconds: 5),
+          ),
+        );
+      }
     }
   }
 
   void _initializeWebView() {
     if (!_urlInitialized) return; // Wait for URL to be initialized
-    
-    controller = WebViewController()
-      ..setJavaScriptMode(JavaScriptMode.unrestricted);
-    
+
+    controller =
+        WebViewController()..setJavaScriptMode(JavaScriptMode.unrestricted);
+
     // Set background color only on supported platforms
     try {
       controller!.setBackgroundColor(const Color(0xFF1a1a1a));
     } catch (e) {
       print('⚠️ Background color not supported on this platform: $e');
     }
-    
+
+    // Android-specific configuration for camera permissions
+    if (Platform.isAndroid) {
+      _configureAndroidWebView();
+    }
+
     controller!
       ..setNavigationDelegate(
-            NavigationDelegate(
-              onProgress: (int progress) {
-                // Update loading progress if needed
-              },
-              onPageStarted: (String url) {
-                if (mounted) {
-                  setState(() {
-                    isLoading = true;
-                    error = null;
-                  });
-                }
-              },
-              onPageFinished: (String url) {
-                if (mounted) {
-                  setState(() {
-                    isLoading = false;
-                  });
-                }
-                // Set up result listener with JavaScript
-                _setupResultListener();
-              },
-              onHttpError: (HttpResponseError error) {
-                if (mounted) {
-                  setState(() {
-                    this.error = 'HTTP Error: ${error.response?.statusCode}';
-                    isLoading = false;
-                  });
-                }
-              },
-              onWebResourceError: (WebResourceError error) {
-                if (mounted) {
-                  setState(() {
-                    this.error = 'Connection Error: ${error.description}';
-                    isLoading = false;
-                  });
-                }
-              },
-            ),
-          )
+        NavigationDelegate(
+          onProgress: (int progress) {
+            // Update loading progress if needed
+          },
+          onPageStarted: (String url) {
+            if (mounted) {
+              setState(() {
+                isLoading = true;
+                error = null;
+              });
+            }
+          },
+          onPageFinished: (String url) {
+            if (mounted) {
+              setState(() {
+                isLoading = false;
+              });
+            }
+            // Set up result listener with JavaScript
+            _setupResultListener();
+          },
+          onHttpError: (HttpResponseError error) {
+            if (mounted) {
+              setState(() {
+                this.error = 'HTTP Error: ${error.response?.statusCode}';
+                isLoading = false;
+              });
+            }
+          },
+          onWebResourceError: (WebResourceError error) {
+            if (mounted) {
+              setState(() {
+                this.error = 'Connection Error: ${error.description}';
+                isLoading = false;
+              });
+            }
+          },
+        ),
+      )
       ..addJavaScriptChannel(
-            'flutterFaceLiveness',
-            onMessageReceived: (JavaScriptMessage message) {
-              _handleMessageFromReact(message.message);
-            },
-          )
-      ..loadRequest(Uri.parse(_urlInitialized ? _faceLivenessUrlWithToken : _faceLivenessUrl));
+        'flutterFaceLiveness',
+        onMessageReceived: (JavaScriptMessage message) {
+          _handleMessageFromReact(message.message);
+        },
+      )
+      ..loadRequest(
+        Uri.parse(
+          _urlInitialized ? _faceLivenessUrlWithToken : _faceLivenessUrl,
+        ),
+      );
+  }
+
+  /// Configure Android WebView for camera permissions
+  void _configureAndroidWebView() {
+    if (Platform.isAndroid && controller!.platform is AndroidWebViewController) {
+      final androidController = controller!.platform as AndroidWebViewController;
+      
+      print('🤖 Configuring Android WebView for camera access...');
+      
+      try {
+        // Enable media playback and DOM storage
+        androidController.setMediaPlaybackRequiresUserGesture(false);
+        
+        print('✅ Android WebView configured for media access');
+      } catch (e) {
+        print('⚠️ Could not configure Android WebView settings: $e');
+      }
+    }
   }
 
   /// Set up JavaScript listener for Face Liveness results
   void _setupResultListener() {
     if (controller == null) return;
-    
+
     // Inject JavaScript to set up a listener for results
     controller!.runJavaScript('''
       console.log('🔧 Setting up Flutter communication...');
+      
+      // Check HTTPS requirement for camera access
+      console.log('🔒 Current URL protocol:', window.location.protocol);
+      if (window.location.protocol !== 'https:') {
+        console.warn('⚠️ Camera access requires HTTPS in modern browsers!');
+      }
+      
+      // Test camera access capabilities
+      if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+        console.log('✅ getUserMedia API is available');
+        
+        // Test camera permissions
+        navigator.permissions.query({ name: 'camera' }).then(function(permissionStatus) {
+          console.log('📷 Camera permission status:', permissionStatus.state);
+        }).catch(function(e) {
+          console.log('⚠️ Cannot query camera permissions:', e);
+        });
+        
+      } else {
+        console.error('❌ getUserMedia API not available!');
+      }
       
       // Ensure flutterFaceLiveness is available
       if (!window.flutterFaceLiveness) {
@@ -287,25 +443,27 @@ class _WebViewFaceLivenessState extends State<WebViewFaceLiveness> {
   void _handleMessageFromReact(String message) {
     try {
       print('📨 Received message from React: $message');
-      
+
       // Validate message is not empty
       if (message.isEmpty) {
         print('⚠️ Empty message received from React');
         return;
       }
-      
+
       final Map<String, dynamic> data = json.decode(message);
       print('📊 Parsed message data: $data');
 
       if (data['type'] == 'FACE_LIVENESS_RESULT') {
         print('✅ Processing Face Liveness result');
-        
+
         // Cancel timeout since we received a result
         _timeoutTimer?.cancel();
-        
+
         // Convert to FaceLivenessResult and notify
         final result = FaceLivenessResult.fromJson(data);
-        print('📋 Converted result: success=${result.success}, isLive=${result.isLive}, confidence=${result.confidence}');
+        print(
+          '📋 Converted result: success=${result.success}, isLive=${result.isLive}, confidence=${result.confidence}',
+        );
 
         if (widget.onResult != null) {
           widget.onResult!(result);
@@ -336,7 +494,7 @@ class _WebViewFaceLivenessState extends State<WebViewFaceLiveness> {
       print('❌ Error handling message from React: $e');
       print('📍 Stack trace: $stackTrace');
       print('📨 Original message: $message');
-      
+
       // Try to determine the specific error
       String errorMessage = 'Failed to process face liveness result';
       if (e is FormatException) {
@@ -345,7 +503,7 @@ class _WebViewFaceLivenessState extends State<WebViewFaceLiveness> {
       } else if (e.toString().contains('type')) {
         errorMessage = 'Missing message type in face liveness response';
       }
-      
+
       if (widget.onError != null) {
         widget.onError!(errorMessage);
       }

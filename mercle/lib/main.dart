@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
-import 'package:mercle/features/face-scan/screens/facescan-home.dart';
 import 'package:provider/provider.dart';
 import 'package:mercle/providers/user_provider.dart';
 import 'package:mercle/router.dart';
@@ -8,6 +7,7 @@ import 'package:mercle/widgets/auth_wrapper.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
   runApp(MyApp());
 }
 
